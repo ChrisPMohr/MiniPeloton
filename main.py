@@ -1,3 +1,12 @@
+class Field(object):
+    def __init__(self, field_type):
+        self.field_type = field_type
+
+
+# class ForeignKeyField(object):
+#      pass
+
+
 class ModelMeta(type):
     all_models = []
 
@@ -7,29 +16,33 @@ class ModelMeta(type):
     def __new__(cls, name, bases, attrs):
         class_created = super(ModelMeta, cls).__new__(cls, name, bases, attrs)
         cls.all_models.append((name, class_created))
-        print(cls.all_models)
+
+        fields = []
+
+        for key, val in attrs.items():
+            if isinstance(val, Field):
+                fields.append(key)
+        class_created._fields = fields
+
         return class_created
-
-
-# class Field(object):
-#    def __init__(self, field_type):
-#        self.field_type = field_type
-
-
-# class ForeignKeyField(object):
-#    pass
 
 
 class Model(object, metaclass=ModelMeta):
     global__data = {}
 
+    incrementing_pk = 0
+
     #    def __new__(cls, name, bases):
     #        for key, value in cls.__dict__.items():
     #            if isinstance(value, Field):
 
-    def __init__(self, id):
-        self.id = id
-        self.__data()[id] = self
+    def __init__(self, **kwargs):
+        self.id = Model.incrementing_pk
+        Model.incrementing_pk += 1
+        self.__data()[self.id] = self
+
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def __str__(self):
         return "<%s %s>" % (type(self), self.id)
@@ -47,17 +60,23 @@ class Model(object, metaclass=ModelMeta):
 
 
 class Ride(Model):
-    pass
+    name = Field(str)
 
 
 class Workout(Model):
-    pass
+    ride_id = Field(str)
+    workout_count = Field(int)
 
 
 if __name__ == '__main__':
-    Ride(3)
-    Ride(4)
-    Workout(3)
+    Ride()
+    Ride()
+    Workout()
 
-    print(list(Ride))
-    print(list(Workout))
+    for ride in Ride:
+        print(ride)
+    for workout in Workout:
+        print(workout)
+
+    print(Ride._fields)
+    print(Workout._fields)
