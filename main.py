@@ -167,19 +167,20 @@ if __name__ == '__main__':
 
     me = User.save_with(username='me')
     w1 = Workout.save_with(ride=r1, user=me, start_time=datetime(2017, 1, 1, 7))
-    w2 = Workout.save_with(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
-    w3 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 1, 9))
-    w4 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 1, 10))
+    w2 = Workout.save_with(ride=r2, user=me, start_time=datetime(2017, 1, 3, 7))
+    w3 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 4, 7))
+    w4 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 8, 7))
 
-    print('User workouts', len(me.workout_set))
-    print('Ride 1 workouts', len(r1.workout_set))
+    print('Num User workouts', len(me.workout_set))
+    print('Num Ride 1 workouts before update', len(r1.workout_set))
     w4.ride = r1
     w4.save()
-    print('Ride 1 workouts', len(r1.workout_set))
+    print('Num Ride 1 workouts after update', len(r1.workout_set))
 
     from collections import Counter
-    counts = Counter(workout.ride.instructor.name for workout in me.workout_set)
-    print("Workout count by instructor", counts)
+
+    instructor_name_counts = Counter(workout.ride.instructor.name for workout in me.workout_set)
+    print("Workout count by instructor", instructor_name_counts)
 
     latest_workout_by_instructor = {}
     for workout in me.workout_set:
@@ -191,3 +192,6 @@ if __name__ == '__main__':
     latest_ride_by_instructor = {instructor.name: workout.ride.name for (instructor, workout)
                                  in latest_workout_by_instructor.items()}
     print("Latest ride by instructor", latest_ride_by_instructor)
+
+    weekday_counts = Counter(workout.start_time.strftime("%a") for workout in me.workout_set)
+    print("Most popular day of week", weekday_counts.most_common(1))
