@@ -40,6 +40,22 @@ class Field(object):
             return instance._vals_[self]
 
 
+class Set(object):
+    def __init__(self, field_type, backref=None):
+        if not isinstance(field_type, (ModelMeta, str)):
+            raise TypeError("Invalid type for set", field_type)
+        self.field_type = field_type
+        self.backref = backref
+
+    def __get__(self, instance, owner):
+        backref = self.backref or type(instance).__name__.lower()
+        if isinstance(self.field_type, ModelMeta):
+            related_type = self.field_type
+        elif isinstance(self.field_type, str):
+            related_type = ModelMeta.all_models[self.field_type]
+        return [el for el in related_type if getattr(el, backref).id == instance.id]
+
+
 class ModelMeta(type):
     all_models = {}
 
@@ -107,6 +123,7 @@ class Instructor(Model):
 class Ride(Model):
     name = Field(str)
     instructor = Field(Instructor)
+    workout_set = Set('Workout')
 
 
 class Workout(Model):
@@ -117,6 +134,7 @@ class Workout(Model):
 
 class User(Model):
     username = Field(str)
+    workout_set = Set(Workout)
 
 
 if __name__ == '__main__':
@@ -131,19 +149,20 @@ if __name__ == '__main__':
     w2 = Workout(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
     w3 = Workout(ride=r3, user=me, start_time=datetime(2017, 1, 1, 9))
 
+    print('User workouts', len(me.workout_set))
+    print('Ride 1 workouts', len(r1.workout_set))
+
     from collections import Counter
-    counts = Counter(workout.ride.instructor.name for workout in Workout
-                     if workout.user.id == me.id)
+    counts = Counter(workout.ride.instructor.name for workout in me.workout_set)
     print("Workout count by instructor", counts)
 
     latest_workout_by_instructor = {}
-    for workout in Workout:
-        if workout.user.id == me.id:
-            instructor = workout.ride.instructor
-            if instructor not in latest_workout_by_instructor:
-                latest_workout_by_instructor[instructor] = workout
-            elif latest_workout_by_instructor[instructor].start_time < workout.start_time:
-                latest_workout_by_instructor[instructor] = workout
+    for workout in me.workout_set:
+        instructor = workout.ride.instructor
+        if instructor not in latest_workout_by_instructor:
+            latest_workout_by_instructor[instructor] = workout
+        elif latest_workout_by_instructor[instructor].start_time < workout.start_time:
+            latest_workout_by_instructor[instructor] = workout
     latest_ride_by_instructor = {instructor.name: workout.ride.name for (instructor, workout)
                                  in latest_workout_by_instructor.items()}
     print("Latest ride by instructor", latest_ride_by_instructor)
