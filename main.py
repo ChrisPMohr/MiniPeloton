@@ -7,9 +7,12 @@ class Field(object):
         self.field_type = field_type
 
     def __set__(self, instance, value):
-        foreign_key_id = value.id
-        setattr(instance, self.field_name, foreign_key_id)
-        return self.model_class[foreign_key_id]
+        if not isinstance(value, self.field_type):
+            raise TypeError("%s is not of type %s" % (str(value), str(self.field_type)))
+        instance._vals_[self] = value
+
+    def __get__(self, instance, owner):
+        return instance._vals_[self]
 
 
 class ForeignKeyField(Field):
@@ -27,23 +30,13 @@ class ForeignKeyField(Field):
         else:
             raise TypeError("Invalid foreign key model", self._model)
 
-    @property
-    def field_name(self):
-        if isinstance(self._model, ModelMeta):
-            return "_" + self._model.__name__
-        elif isinstance(self._model, str):
-            return "_" + self._model
-        else:
-            raise TypeError("Invalid foreign key model", self._model)
-
     def __get__(self, instance, owner):
-        foreign_key_id = getattr(instance, self.field_name)
+        foreign_key_id = instance._vals_[self]
         return self.model_class[foreign_key_id]
 
     def __set__(self, instance, value):
         foreign_key_id = value.id
-        setattr(instance, self.field_name, foreign_key_id)
-        return self.model_class[foreign_key_id]
+        instance._vals_[self] = foreign_key_id
 
 
 class ModelMeta(type):
@@ -75,6 +68,7 @@ class Model(object, metaclass=ModelMeta):
 
     def __init__(self, **kwargs):
         self.id = Model.incrementing_pk
+        self._vals_ = {}
         Model.incrementing_pk += 1
         self.__data()[self.id] = self
         for k, v in kwargs.items():
@@ -106,9 +100,13 @@ class Model(object, metaclass=ModelMeta):
 
 from datetime import datetime
 
+
+class Instructor(Model):
+    name = Field(str)
+
+
 class Ride(Model):
     name = Field(str)
-    start_time = Field(datetime)
 
 
 class Workout(Model):
