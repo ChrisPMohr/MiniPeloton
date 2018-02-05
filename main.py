@@ -1,3 +1,6 @@
+from copy import copy
+
+
 class DoesNotExist(BaseException):
     pass
 
@@ -83,13 +86,13 @@ class Model(object, metaclass=ModelMeta):
     global__data = {}
     incrementing_pk = 0
 
-    def __init__(self, **kwargs):
-        self.id = Model.incrementing_pk
+    def __init__(self, _is_new=True, **kwargs):
         self._vals_ = {}
-        Model.incrementing_pk += 1
-        self.__data()[self.id] = self
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        if _is_new:
+            self.id = Model.incrementing_pk
+            Model.incrementing_pk += 1
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
     def __str__(self):
         return "<%s %s>" % (type(self), self.id)
@@ -97,22 +100,40 @@ class Model(object, metaclass=ModelMeta):
     def __repr__(self):
         return "<%s %s>" % (type(self), self.id)
 
+    def save(self):
+        self.__data()[self.id] = copy(self._vals_)
+
+    @classmethod
+    def save_with(cls, **kwargs):
+        new_instance = cls(**kwargs)
+        new_instance.save()
+        return new_instance
+
     @classmethod
     def __data(cls):
         return cls.global__data.setdefault(cls, {})
 
     @classmethod
+    def _make_from_vals(cls, id, vals):
+        instance = cls(_is_new=False)
+        instance.id = id
+        instance._vals_ = vals
+        return instance
+
+    @classmethod
     def get_item(cls, key):
-        result = cls.__data().get(key)
-        if result is None:
+        saved_vals = cls.__data().get(key)
+        if saved_vals is None:
             raise DoesNotExist
-        return result
+        return cls._make_from_vals(key, saved_vals)
 
     @classmethod
     def get_all_instances(cls):
-        return iter(cls.__data().values())
+        return iter(cls._make_from_vals(id, vals) for id, vals in cls.__data().items())
 
 # ------ORM ends here-------
+
+
 from datetime import datetime
 
 
@@ -138,18 +159,22 @@ class User(Model):
 
 
 if __name__ == '__main__':
-    cody = Instructor(name="Cody")
-    jess = Instructor(name="Jess")
-    r1 = Ride(name="Cody's Rock Ride", instructor=cody)
-    r2 = Ride(name="Cody's Disco Ride", instructor=cody)
-    r3 = Ride(name="Jess's Pop Ride", instructor=jess)
+    cody = Instructor.save_with(name="Cody")
+    jess = Instructor.save_with(name="Jess")
+    r1 = Ride.save_with(name="Cody's Rock Ride", instructor=cody)
+    r2 = Ride.save_with(name="Cody's Disco Ride", instructor=cody)
+    r3 = Ride.save_with(name="Jess's Pop Ride", instructor=jess)
 
-    me = User(username='me')
-    w1 = Workout(ride=r1, user=me, start_time=datetime(2017, 1, 1, 7))
-    w2 = Workout(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
-    w3 = Workout(ride=r3, user=me, start_time=datetime(2017, 1, 1, 10))
+    me = User.save_with(username='me')
+    w1 = Workout.save_with(ride=r1, user=me, start_time=datetime(2017, 1, 1, 7))
+    w2 = Workout.save_with(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
+    w3 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 1, 9))
+    w4 = Workout.save_with(ride=r3, user=me, start_time=datetime(2017, 1, 1, 10))
 
     print('User workouts', len(me.workout_set))
+    print('Ride 1 workouts', len(r1.workout_set))
+    w4.ride = r1
+    w4.save()
     print('Ride 1 workouts', len(r1.workout_set))
 
     from collections import Counter
