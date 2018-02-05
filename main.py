@@ -4,39 +4,40 @@ class DoesNotExist(BaseException):
 
 class Field(object):
     def __init__(self, field_type):
+        if not isinstance(field_type, (type, str)):
+            raise TypeError("Invalid field type", field_type)
         self.field_type = field_type
-
-    def __set__(self, instance, value):
-        if not isinstance(value, self.field_type):
-            raise TypeError("%s is not of type %s" % (str(value), str(self.field_type)))
-        instance._vals_[self] = value
-
-    def __get__(self, instance, owner):
-        return instance._vals_[self]
-
-
-class ForeignKeyField(Field):
-    def __init__(self, model):
-        if not isinstance(model, (ModelMeta, str)):
-            raise TypeError("Invalid foreign key", model)
-        self._model = model
+        self.is_relation = isinstance(field_type, (ModelMeta, str))
 
     @property
     def model_class(self):
-        if isinstance(self._model, ModelMeta):
-            return self._model
-        elif isinstance(self._model, str):
-            return ModelMeta.all_models[self._model]
+        if not self.is_relation:
+            raise Exception()
+        if isinstance(self.field_type, ModelMeta):
+            return self.field_type
+        elif isinstance(self.field_type, str):
+            return ModelMeta.all_models[self.field_type]
         else:
-            raise TypeError("Invalid foreign key model", self._model)
-
-    def __get__(self, instance, owner):
-        foreign_key_id = instance._vals_[self]
-        return self.model_class[foreign_key_id]
+            raise TypeError("Invalid foreign key model", self.field_type)
 
     def __set__(self, instance, value):
-        foreign_key_id = value.id
-        instance._vals_[self] = foreign_key_id
+        if self.is_relation:
+            field_type = self.model_class
+        else:
+            field_type = self.field_type
+        if not isinstance(value, field_type):
+            raise TypeError("%s is not of type %s" % (str(value), str(field_type)))
+        if self.is_relation:
+            instance._vals_[self] = value.id
+        else:
+            instance._vals_[self] = value
+
+    def __get__(self, instance, owner):
+        if self.is_relation:
+            foreign_key_id = instance._vals_[self]
+            return self.model_class[foreign_key_id]
+        else:
+            return instance._vals_[self]
 
 
 class ModelMeta(type):
@@ -96,8 +97,6 @@ class Model(object, metaclass=ModelMeta):
         return iter(cls.__data().values())
 
 # ------ORM ends here-------
-
-
 from datetime import datetime
 
 
@@ -107,28 +106,44 @@ class Instructor(Model):
 
 class Ride(Model):
     name = Field(str)
+    instructor = Field(Instructor)
 
 
 class Workout(Model):
-    ride = ForeignKeyField(Ride)
+    ride = Field(Ride)
+    user = Field('User')
+    start_time = Field(datetime)
+
+
+class User(Model):
+    username = Field(str)
 
 
 if __name__ == '__main__':
-    r1 = Ride(name="Cody's Rock Ride")
-    r2 = Ride(name="Jess's Pop Ride")
-    w1 = Workout(ride=r1)
+    cody = Instructor(name="Cody")
+    jess = Instructor(name="Jess")
+    r1 = Ride(name="Cody's Rock Ride", instructor=cody)
+    r2 = Ride(name="Cody's Disco Ride", instructor=cody)
+    r3 = Ride(name="Jess's Pop Ride", instructor=jess)
 
-    print('Ride 1', r1.id, r1.name)
-    print('Workout', w1.id, w1.ride.name)
-    w1.ride.name = "New Name"
-    print('Updated name', r1.name)
+    me = User(username='me')
+    w1 = Workout(ride=r1, user=me, start_time=datetime(2017, 1, 1, 7))
+    w2 = Workout(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
+    w3 = Workout(ride=r3, user=me, start_time=datetime(2017, 1, 1, 9))
 
-    print('All Rides')
-    for ride in Ride:
-        print(ride)
-    print('All Workouts')
+    from collections import Counter
+    counts = Counter(workout.ride.instructor.name for workout in Workout
+                     if workout.user.id == me.id)
+    print("Workout count by instructor", counts)
+
+    latest_workout_by_instructor = {}
     for workout in Workout:
-        print(workout)
-
-    print(Ride._fields)
-    print(Workout._fields)
+        if workout.user.id == me.id:
+            instructor = workout.ride.instructor
+            if instructor not in latest_workout_by_instructor:
+                latest_workout_by_instructor[instructor] = workout
+            elif latest_workout_by_instructor[instructor].start_time < workout.start_time:
+                latest_workout_by_instructor[instructor] = workout
+    latest_ride_by_instructor = {instructor.name: workout.ride.name for (instructor, workout)
+                                 in latest_workout_by_instructor.items()}
+    print("Latest ride by instructor", latest_ride_by_instructor)
