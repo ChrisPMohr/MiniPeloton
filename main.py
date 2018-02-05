@@ -147,7 +147,7 @@ if __name__ == '__main__':
     me = User(username='me')
     w1 = Workout(ride=r1, user=me, start_time=datetime(2017, 1, 1, 7))
     w2 = Workout(ride=r2, user=me, start_time=datetime(2017, 1, 1, 8))
-    w3 = Workout(ride=r3, user=me, start_time=datetime(2017, 1, 1, 9))
+    w3 = Workout(ride=r3, user=me, start_time=datetime(2017, 1, 1, 10))
 
     print('User workouts', len(me.workout_set))
     print('Ride 1 workouts', len(r1.workout_set))
